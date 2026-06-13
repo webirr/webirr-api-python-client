@@ -31,7 +31,7 @@ Create the client with merchant ID, API key, and environment once. The client au
 
 ## Example
 
-The examples below keep the PHP and .NET README flow: create the client, call the API, check `error`, handle the success branch, and print `error_code` on failure.
+The examples below create the client, call the API, check `error`, handle the success branch, and print `error_code` on failure.
 
 ### Creating a new Bill / Updating an existing Bill on WeBirr Servers
 
@@ -442,7 +442,7 @@ main()
 
 ## Examples
 
-The `examples` directory includes separate workflows matching the PHP SDK examples:
+The `examples` directory includes separate workflows for the common gateway operations:
 
 ```bash
 python examples/example1_create_update_bill.py
