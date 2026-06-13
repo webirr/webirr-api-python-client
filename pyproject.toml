@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webirr"
+version = "1.0.0"
+description = "Official Python Client Library for WeBirr Payment Gateway APIs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "WeBirr" }
+]
+dependencies = [
+  "requests>=2.28"
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business :: Financial"
+]
+
+[project.urls]
+Homepage = "https://github.com/webirr/webirr-api-python-client"
+Source = "https://github.com/webirr/webirr-api-python-client"
+Issues = "https://github.com/webirr/webirr-api-python-client/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+webirr = ["py.typed"]
