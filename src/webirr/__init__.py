@@ -9,6 +9,7 @@ from .models import (
     PaymentResponse,
     PaymentStatus,
     Stat,
+    SupportedBank,
 )
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "PaymentResponse",
     "PaymentStatus",
     "Stat",
+    "SupportedBank",
     "WeBirrClient",
 ]
 

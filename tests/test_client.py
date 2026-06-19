@@ -9,6 +9,7 @@ from webirr import (
     PaymentResponse,
     PaymentStatus,
     Stat,
+    SupportedBank,
     WeBirrClient,
 )
 
@@ -52,8 +53,8 @@ class WeBirrClientTests(unittest.TestCase):
         test_session = FakeSession()
         prod_session = FakeSession()
 
-        WeBirrClient("0305", "api-key", True, session=test_session).delete_bill("123")
-        WeBirrClient("0305", "api-key", False, session=prod_session).delete_bill("123")
+        WeBirrClient("merchant-from-client", "api-key", True, session=test_session).delete_bill("123")
+        WeBirrClient("merchant-from-client", "api-key", False, session=prod_session).delete_bill("123")
 
         self.assertEqual("https://api.webirr.net/einvoice/api/bill", test_session.requests[0]["url"])
         self.assertEqual("https://api.webirr.net:8080/einvoice/api/bill", prod_session.requests[0]["url"])
@@ -99,7 +100,7 @@ class WeBirrClientTests(unittest.TestCase):
 
         exercise_all_endpoints(client)
 
-        self.assertGreaterEqual(len(session.requests), 9)
+        self.assertGreaterEqual(len(session.requests), 10)
         for request in session.requests:
             self.assertEqual("merchant-from-client", request["params"]["merchant_id"], request)
 
@@ -114,7 +115,7 @@ class WeBirrClientTests(unittest.TestCase):
 
     def test_endpoint_methods_use_current_gateway_routes(self):
         session = FakeSession(responses=endpoint_responses())
-        client = WeBirrClient("0305", "x", True, session=session)
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
         exercise_all_endpoints(client)
 
@@ -130,6 +131,7 @@ class WeBirrClientTests(unittest.TestCase):
                 ("GET", "einvoice/api/bills"),
                 ("GET", "einvoice/api/payments"),
                 ("GET", "merchant/stat"),
+                ("GET", "einvoice/api/banks"),
             ],
             observed,
         )
@@ -162,7 +164,7 @@ class WeBirrClientTests(unittest.TestCase):
                 "customerName": "SDK Test Customer",
                 "customerPhone": "0911000000",
                 "billReference": "python/unit/1",
-                "merchantID": "0305",
+                "merchantID": "merchant-from-client",
                 "amount": "278.00",
                 "wbcCode": "123 456 789",
                 "paymentStatus": 0,
@@ -232,6 +234,31 @@ class WeBirrClientTests(unittest.TestCase):
         self.assertEqual(2, stat.n_bills_paid)
         self.assertEqual("100.00", stat.amount_bills)
 
+    def test_supported_bank_deserializes_bank_id_wire_field(self):
+        bank = SupportedBank.from_dict({"bankID": "cbe_mobile", "name": "CBE Mobile Banking"})
+
+        self.assertEqual("cbe_mobile", bank.bank_id)
+        self.assertEqual("cbe_mobile", bank.bankID)
+        self.assertEqual("CBE Mobile Banking", bank.name)
+
+    def test_get_supported_banks_returns_typed_bank_list(self):
+        session = FakeSession(
+            FakeResponse(
+                payload={
+                    "error": None,
+                    "res": [{"bankID": "cbe_mobile", "name": "CBE Mobile Banking"}],
+                    "errorCode": None,
+                }
+            )
+        )
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
+
+        response = client.get_supported_banks()
+
+        self.assertIsNone(response.error)
+        self.assertEqual("cbe_mobile", response.res[0].bank_id)
+        self.assertEqual("CBE Mobile Banking", response.res[0].name)
+
     def test_api_response_uses_error_code_alias(self):
         response = ApiResponse.from_dict({"error": "bad", "errorCode": "ERROR_INVALID_INPUT"})
 
@@ -240,7 +267,7 @@ class WeBirrClientTests(unittest.TestCase):
 
     def test_http_error_returns_api_response_error(self):
         session = FakeSession(FakeResponse(status_code=403, payload={}, reason="Forbidden"))
-        client = WeBirrClient("0305", "x", True, session=session)
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
         response = client.delete_bill("123")
 
@@ -248,7 +275,7 @@ class WeBirrClientTests(unittest.TestCase):
 
     def test_invalid_json_returns_api_response_error(self):
         session = FakeSession(FakeResponse(payload=ValueError("bad json")))
-        client = WeBirrClient("0305", "x", True, session=session)
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
         response = client.delete_bill("123")
 
@@ -277,6 +304,7 @@ def exercise_all_endpoints(client):
     client.get_bills(-1, "20251231", 10)
     client.get_payments("20251231", 10)
     client.get_stat("2025-01-01", "2030-01-31")
+    client.get_supported_banks()
 
 
 def endpoint_responses():
@@ -290,6 +318,7 @@ def endpoint_responses():
         FakeResponse(payload={"error": None, "res": [{"billReference": "python/unit/1"}], "errorCode": None}),
         FakeResponse(payload={"error": None, "res": [{"paymentDate": "2026-06-12 10:11:12"}], "errorCode": None}),
         FakeResponse(payload={"error": None, "res": {"NBills": 1}, "errorCode": None}),
+        FakeResponse(payload={"error": None, "res": [{"bankID": "cbe_mobile", "name": "CBE Mobile Banking"}], "errorCode": None}),
     ]
 
 

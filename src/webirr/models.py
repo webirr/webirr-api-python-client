@@ -239,6 +239,26 @@ class PaymentResponse(PaymentDetail):
 
 
 @dataclass
+class SupportedBank:
+    """Bank enabled for the configured merchant checkout."""
+
+    bank_id: str = ""
+    name: str = ""
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "SupportedBank":
+        source = _to_dict(data)
+        return cls(
+            bank_id=str(_lookup(source, "bankID", "bankid", "bank_id")),
+            name=str(_lookup(source, "name", "bankName", "bank_name")),
+        )
+
+    @property
+    def bankID(self) -> str:
+        return self.bank_id
+
+
+@dataclass
 class Stat:
     """Basic statistics for bills and payments."""
 

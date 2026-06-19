@@ -15,6 +15,7 @@ from .models import (
     PaymentResponse,
     PaymentStatus,
     Stat,
+    SupportedBank,
     list_of,
 )
 
@@ -129,6 +130,15 @@ class WeBirrClient:
             "merchant/stat",
             params={"date_from": date_from, "date_to": date_to},
             res_factory=Stat.from_dict,
+        )
+
+    def get_supported_banks(self) -> ApiResponse[list[SupportedBank]]:
+        """Get banks enabled for this merchant checkout."""
+
+        return self._send(
+            "GET",
+            "einvoice/api/banks",
+            res_factory=list_of(SupportedBank.from_dict),
         )
 
     def _prepare_bill(self, bill: Bill) -> Bill:

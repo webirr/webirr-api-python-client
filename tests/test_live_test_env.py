@@ -40,6 +40,16 @@ class LiveTestEnvSmokeTests(unittest.TestCase):
         if cls.payment_code and not cls.deleted:
             cls.api.delete_bill(cls.payment_code)
 
+    def test_00_get_supported_banks(self):
+        response = self.api.get_supported_banks()
+
+        self.assert_no_api_error(response, "GetSupportedBanks")
+        self.assertIsInstance(response.res, list)
+        self.assertGreater(len(response.res), 0)
+        for bank in response.res:
+            self.assertTrue(bank.bank_id)
+            self.assertTrue(bank.name)
+
     def test_01_create_bill_without_manual_merchant_id(self):
         bill = self.sample_bill()
 

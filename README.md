@@ -163,6 +163,37 @@ main()
 
 Timestamp cursors can be date-only (`yyyyMMdd`) or include time (`yyyyMMddHHmmss`). Use empty string only when you intentionally want all history from the beginning.
 
+### Getting Supported Banks for Checkout
+
+```python
+import os
+
+from webirr import WeBirrClient
+
+
+def main():
+    api_key = os.getenv("WEBIRR_TEST_ENV_API_KEY", "")
+    merchant_id = os.getenv("WEBIRR_TEST_ENV_MERCHANT_ID", "")
+
+    api = WeBirrClient(merchant_id, api_key, True)
+
+    print("\nGetting supported banks...")
+    res = api.get_supported_banks()
+
+    if not res.error:
+        for bank in res.res or []:
+            print(f"{bank.bank_id} - {bank.name}")
+        print("\nUse only these merchant-specific banks when showing checkout payment instructions.")
+    else:
+        print(f"\nerror: {res.error}")
+        print(f"\nerrorCode: {res.error_code}")
+
+
+main()
+```
+
+Checkout pages should render bank-specific instructions only from `get_supported_banks()`. Do not show a broad static bank list unless those banks are returned for the configured merchant.
+
 ### Getting Payment status of an existing Bill from WeBirr Servers
 
 ```python
@@ -452,6 +483,7 @@ python examples/example4_payment_status_bulk_poll.py
 python examples/example5_stat_report.py
 python examples/example6_payment_status_webhook.py
 python examples/example7_get_bill_and_list_bills.py
+python examples/example8_supported_banks.py
 ```
 
 ## Reusable HTTP Session
