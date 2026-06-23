@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Callable, TypeVar
 from urllib.parse import urljoin
 
@@ -25,7 +26,7 @@ T = TypeVar("T")
 class WeBirrClient:
     """Client for WeBirr merchant APIs."""
 
-    TEST_BASE_URL = "https://api.webirr.net"
+    TEST_BASE_URL = "https://api.webirr.dev"
     PROD_BASE_URL = "https://api.webirr.net:8080"
 
     def __init__(
@@ -34,13 +35,23 @@ class WeBirrClient:
         api_key: str,
         is_test_env: bool = True,
         session: requests.Session | None = None,
-        base_url: str | None = None,
     ) -> None:
         self.merchant_id = merchant_id or ""
         self.api_key = api_key or ""
-        self.base_url = (base_url or (self.TEST_BASE_URL if is_test_env else self.PROD_BASE_URL)).rstrip("/")
+        self.base_url = self._resolve_base_url(is_test_env)
         self.session = session or requests.Session()
         self.session.headers.setdefault("Accept", "application/json")
+
+    @classmethod
+    def _resolve_base_url(cls, is_test_env: bool) -> str:
+        if not is_test_env:
+            return cls.PROD_BASE_URL
+
+        gateway_url = os.environ.get("GATEWAY_URL", "").strip()
+        if gateway_url:
+            return gateway_url.rstrip("/")
+
+        return cls.TEST_BASE_URL
 
     def create_bill(self, bill: Bill) -> ApiResponse[str]:
         """Create a new bill and return the payment code in ``response.res``."""

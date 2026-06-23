@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest.mock import patch
 
 from webirr import (
     ApiResponse,
@@ -56,12 +57,12 @@ class WeBirrClientTests(unittest.TestCase):
         WeBirrClient("merchant-from-client", "api-key", True, session=test_session).delete_bill("123")
         WeBirrClient("merchant-from-client", "api-key", False, session=prod_session).delete_bill("123")
 
-        self.assertEqual("https://api.webirr.net/einvoice/api/bill", test_session.requests[0]["url"])
+        self.assertEqual("https://api.webirr.dev/einvoice/api/bill", test_session.requests[0]["url"])
         self.assertEqual("https://api.webirr.net:8080/einvoice/api/bill", prod_session.requests[0]["url"])
 
-    def test_can_use_custom_base_url_and_injected_session(self):
+    def test_can_use_injected_session_for_requests(self):
         session = FakeSession()
-        client = WeBirrClient("merchant-from-client", "x", True, session=session, base_url="https://gateway.example.com")
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
         response = client.delete_bill("123 456 789")
 
@@ -69,9 +70,23 @@ class WeBirrClientTests(unittest.TestCase):
         self.assertEqual("OK", response.res)
         self.assertEqual(1, len(session.requests))
         self.assertEqual("DELETE", session.requests[0]["method"])
-        self.assertEqual("https://gateway.example.com/einvoice/api/bill", session.requests[0]["url"])
+        self.assertEqual("https://api.webirr.dev/einvoice/api/bill", session.requests[0]["url"])
         self.assertEqual("merchant-from-client", session.requests[0]["params"]["merchant_id"])
         self.assertEqual("123 456 789", session.requests[0]["params"]["wbc_code"])
+
+    def test_testenv_can_use_internal_gateway_url_override(self):
+        session = FakeSession()
+        with patch.dict("os.environ", {"GATEWAY_URL": "https://local-gateway.example/"}, clear=False):
+            WeBirrClient("merchant-from-client", "x", True, session=session).delete_bill("123")
+
+        self.assertEqual("https://local-gateway.example/einvoice/api/bill", session.requests[0]["url"])
+
+    def test_production_ignores_internal_gateway_url_override(self):
+        session = FakeSession()
+        with patch.dict("os.environ", {"GATEWAY_URL": "https://local-gateway.example/"}, clear=False):
+            WeBirrClient("merchant-from-client", "x", False, session=session).delete_bill("123")
+
+        self.assertEqual("https://api.webirr.net:8080/einvoice/api/bill", session.requests[0]["url"])
 
     def test_create_bill_sets_client_merchant_id_before_sending(self):
         session = FakeSession()
