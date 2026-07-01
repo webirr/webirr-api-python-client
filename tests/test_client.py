@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+import requests
+
 from webirr import (
     ApiResponse,
     Bill,
@@ -26,15 +28,23 @@ class FakeResponse:
             raise self._payload
         return self._payload
 
+    def raise_for_status(self):
+        if 200 <= self.status_code < 300:
+            return
+        raise requests.HTTPError(f"{self.status_code} {self.reason}".strip(), response=self)
+
 
 class FakeSession:
-    def __init__(self, response=None, responses=None):
+    def __init__(self, response=None, responses=None, exception=None):
         self.response = response or FakeResponse()
         self.responses = list(responses or [])
+        self.exception = exception
         self.requests = []
         self.headers = {}
 
     def request(self, method, url, params=None, json=None, timeout=None):
+        if self.exception:
+            raise self.exception
         self.requests.append(
             {
                 "method": method,
@@ -280,21 +290,46 @@ class WeBirrClientTests(unittest.TestCase):
         self.assertEqual("ERROR_INVALID_INPUT", response.error_code)
         self.assertEqual(response.error_code, response.errorCode)
 
-    def test_http_error_returns_api_response_error(self):
+    def test_request_exception_flows_through_native_channel(self):
+        session = FakeSession(exception=requests.Timeout("timed out"))
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
+
+        with self.assertRaises(requests.Timeout):
+            client.delete_bill("123")
+
+    def test_non_2xx_raises_requests_http_error(self):
         session = FakeSession(FakeResponse(status_code=403, payload={}, reason="Forbidden"))
         client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
-        response = client.delete_bill("123")
+        with self.assertRaises(requests.HTTPError) as raised:
+            client.delete_bill("123")
 
-        self.assertEqual("http error 403 Forbidden", response.error)
+        self.assertIs(raised.exception.response, session.response)
 
-    def test_invalid_json_returns_api_response_error(self):
+    def test_invalid_json_raises_native_exception(self):
         session = FakeSession(FakeResponse(payload=ValueError("bad json")))
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
+
+        with self.assertRaises(ValueError):
+            client.delete_bill("123")
+
+    def test_non_object_json_raises_type_error(self):
+        session = FakeSession(FakeResponse(payload=[]))
+        client = WeBirrClient("merchant-from-client", "x", True, session=session)
+
+        with self.assertRaises(TypeError):
+            client.delete_bill("123")
+
+    def test_2xx_business_error_stays_in_api_response(self):
+        session = FakeSession(
+            FakeResponse(payload={"error": "bad input", "errorCode": "ERROR_INVALID_INPUT", "res": None})
+        )
         client = WeBirrClient("merchant-from-client", "x", True, session=session)
 
         response = client.delete_bill("123")
 
-        self.assertEqual("invalid json response", response.error)
+        self.assertEqual("bad input", response.error)
+        self.assertEqual("ERROR_INVALID_INPUT", response.error_code)
 
 
 def sample_bill():

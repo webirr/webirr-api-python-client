@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Callable, TypeVar
 from urllib.parse import urljoin
@@ -188,16 +187,10 @@ class WeBirrClient:
         response: requests.Response,
         res_factory: Callable[[Any], T] | None = None,
     ) -> ApiResponse[T]:
-        if not 200 <= response.status_code < 300:
-            reason = getattr(response, "reason", "") or ""
-            return ApiResponse(error=f"http error {response.status_code} {reason}".strip())
-
-        try:
-            payload = response.json()
-        except (ValueError, json.JSONDecodeError):
-            return ApiResponse(error="invalid json response")
+        response.raise_for_status()
+        payload = response.json()
 
         if not isinstance(payload, dict):
-            return ApiResponse(error="invalid response shape")
+            raise TypeError("WeBirr API response must be a JSON object")
 
         return ApiResponse.from_dict(payload, res_factory)
