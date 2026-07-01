@@ -29,34 +29,6 @@ export WEBIRR_TEST_ENV_API_KEY="YOUR_TEST_API_KEY"
 
 Create the client with merchant ID, API key, and environment once. The client automatically sets `Bill.merchant_id` before sending bill create/update requests, so application code and examples should not set `merchant_id` on the bill object.
 
-## Error handling & retries
-
-WeBirr business errors come back on an HTTP **2xx** response in `ApiResponse.error` / `ApiResponse.error_code`, for example invalid API key or duplicate bill reference. Everything else is a platform error surfaced through Python exceptions, not through `ApiResponse`: network/DNS/TLS failures, `requests.exceptions.Timeout` / `ConnectionError`, **non-2xx** HTTP via `requests.HTTPError`, and empty, non-JSON, or non-object 2xx bodies.
-
-Retry only transient platform errors with exponential backoff + jitter: connection errors, timeouts, and HTTP **5xx / 429 / 408**. Never retry other **4xx** responses. Create and read operations are safe to retry. `delete_bill` is also safe to retry, but a retry after it already succeeded returns an "invalid payment code" business error; treat that as already deleted.
-
-```python
-import requests
-
-try:
-    response = api.create_bill(bill)
-    if response.error:
-        # WeBirr business error from a 2xx ApiResponse envelope.
-        print(f"WeBirr error {response.error_code}: {response.error}")
-    else:
-        print(f"Payment Code = {response.res}")
-except requests.HTTPError as exc:
-    status = exc.response.status_code if exc.response is not None else None
-    # Platform error. Retry only status in {408, 429} or 5xx.
-    raise
-except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-    # Transient platform error, safe to retry.
-    raise
-except (ValueError, TypeError):
-    # Empty, non-JSON, or non-object 2xx body: platform error.
-    raise
-```
-
 ## Example
 
 The examples below create the client, call the API, check `error`, handle the success branch, and print `error_code` on failure.
@@ -528,3 +500,37 @@ api = WeBirrClient(merchant_id, api_key, True, session=session)
 ```
 
 The SDK does not silently retry bill creation. Configure retry behavior in your application so duplicate create/update processing remains under your control.
+
+## Error handling & retries
+
+WeBirr business errors come back on an HTTP **2xx** response in `ApiResponse.error` / `ApiResponse.error_code`, for example invalid API key or duplicate bill reference. Everything else is a platform error surfaced through Python exceptions, not through `ApiResponse`: network/DNS/TLS failures, `requests.exceptions.Timeout` / `ConnectionError`, **non-2xx** HTTP via `requests.HTTPError`, and empty, non-JSON, or non-object 2xx bodies.
+
+Retry only transient platform errors with exponential backoff + jitter: connection errors, timeouts, and HTTP **5xx / 429 / 408**. Use `TransientErrors.is_transient(exc)` to apply that rule. Never retry other **4xx** responses. Create and read operations are safe to retry. `delete_bill` is also safe to retry, but a retry after it already succeeded returns an "invalid payment code" business error; treat that as already deleted.
+
+```python
+import requests
+
+from webirr import TransientErrors
+
+try:
+    response = api.create_bill(bill)
+    if response.error:
+        # WeBirr business error from a 2xx ApiResponse envelope.
+        print(f"WeBirr error {response.error_code}: {response.error}")
+    else:
+        print(f"Payment Code = {response.res}")
+except requests.RequestException as exc:
+    if TransientErrors.is_transient(exc):
+        # Transient platform error: connection/timeout failure,
+        # HTTP 5xx, 429, or 408.
+        # Safe to retry with backoff + jitter.
+        pass
+    else:
+        # Non-transient platform error: HTTP 4xx other than 408/429.
+        # Do not retry automatically.
+        pass
+except (ValueError, TypeError):
+    # Non-transient platform error: empty, non-JSON, or non-object 2xx body.
+    # Do not retry automatically.
+    pass
+```

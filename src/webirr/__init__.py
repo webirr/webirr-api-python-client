@@ -1,6 +1,7 @@
 """Official Python client library for WeBirr Payment Gateway APIs."""
 
 from .client import WeBirrClient
+from .errors import TransientErrors
 from .models import (
     ApiResponse,
     Bill,
@@ -21,7 +22,8 @@ __all__ = [
     "PaymentStatus",
     "Stat",
     "SupportedBank",
+    "TransientErrors",
     "WeBirrClient",
 ]
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"

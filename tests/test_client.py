@@ -13,6 +13,7 @@ from webirr import (
     PaymentStatus,
     Stat,
     SupportedBank,
+    TransientErrors,
     WeBirrClient,
 )
 
@@ -306,6 +307,16 @@ class WeBirrClientTests(unittest.TestCase):
 
         self.assertIs(raised.exception.response, session.response)
 
+    def test_transient_errors_classifies_retryable_platform_failures(self):
+        self.assertTrue(TransientErrors.is_transient(requests.Timeout("timed out")))
+        self.assertTrue(TransientErrors.is_transient(requests.ConnectionError("connection refused")))
+        self.assertTrue(TransientErrors.is_transient(http_error(503)))
+        self.assertTrue(TransientErrors.is_transient(http_error(429)))
+        self.assertTrue(TransientErrors.is_transient(http_error(408)))
+        self.assertFalse(TransientErrors.is_transient(http_error(400)))
+        self.assertFalse(TransientErrors.is_transient(ValueError("bad json")))
+        self.assertFalse(TransientErrors.is_transient(TypeError("not an object")))
+
     def test_invalid_json_raises_native_exception(self):
         session = FakeSession(FakeResponse(payload=ValueError("bad json")))
         client = WeBirrClient("merchant-from-client", "x", True, session=session)
@@ -370,6 +381,15 @@ def endpoint_responses():
         FakeResponse(payload={"error": None, "res": {"NBills": 1}, "errorCode": None}),
         FakeResponse(payload={"error": None, "res": [{"bankID": "cbe_mobile", "name": "CBE Mobile Banking"}], "errorCode": None}),
     ]
+
+
+def http_error(status_code):
+    response = FakeResponse(status_code=status_code, payload={}, reason="Error")
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        return exc
+    raise AssertionError("expected HTTPError")
 
 
 if __name__ == "__main__":
